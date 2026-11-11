@@ -1,82 +1,116 @@
+<div align="center">
+
 # Grover Search with an Unknown Number of Solutions
 
-**Computational research | Five Jupyter notebooks | Ideal quantum query model**
+**How should quantum search proceed when the number of marked states is unknown?**
 
-Grover search can amplify the probability of measuring a marked item, but choosing the number of iterations normally depends on knowing how many items are marked. When that count is unknown, a poorly chosen stopping point can undo the amplification.
+A numerical investigation of Grover amplification, randomized stopping times, adaptive BBHT, quantum counting, and optimal fixed point search.
 
-This project implements and compares established approaches to that problem, progressing from ordinary Grover search through sensitivity analysis, randomized iteration schedules, adaptive BBHT, quantum counting assisted search, and optimal fixed point amplitude amplification. The objective is to study the **information each method needs**, its **complete oracle query cost**, and the **reliability of its output**.
+<p>
+  <img src="https://img.shields.io/badge/Jupyter-5%20notebooks-F37626?logo=jupyter&logoColor=white" alt="Five Jupyter notebooks">
+  <img src="https://img.shields.io/badge/study-finite%20instances-2563EB" alt="Finite instance study">
+  <img src="https://img.shields.io/badge/model-ideal%20quantum%20oracles-64748B" alt="Ideal quantum oracle model">
+  <img src="https://img.shields.io/badge/status-published%20research%20snapshot-16803C" alt="Published research snapshot">
+</p>
 
-The repository is a finished **five notebook research snapshot**, not a claim of a new search algorithm or a demonstration of speedup on physical hardware.
+[**Results**](#results-at-a-glance) &nbsp;·&nbsp; [**Notebooks**](#notebook-roadmap) &nbsp;·&nbsp; [**Methodology**](#methodology-and-fairness) &nbsp;·&nbsp; [**Reproduce**](#run-the-notebooks) &nbsp;·&nbsp; [**References**](REFERENCES.md)
 
-## Research question
+</div>
 
-For an unsorted search space containing $N$ items, suppose an unknown number $s$ satisfies the marking predicate. How should a search strategy operate without knowing $s$, and what does it cost to find and verify a marked item?
+## The problem
 
-The initial marked fraction is $a=s/N$. After $j$ standard Grover iterations,
+Grover's algorithm amplifies the probability of finding a marked item in an unstructured search space. But its optimal stopping time depends on the number of marked items. When that count is unknown, too many iterations can reduce the probability of success instead of improving it.
+
+For a database of size $N$ containing $s$ marked elements, the success probability after $j$ ordinary Grover iterations is
 
 $$
 P(j;N,s)=\sin^2\!\left((2j+1)\arcsin\sqrt{s/N}\right).
 $$
 
-Because this probability oscillates, a stopping depth that works for one marked count may fail for another. The notebooks examine how randomization, adaptation, estimation, and fixed point sequences respond to this difficulty.
+This project asks how different search strategies respond to that uncertainty, and how they compare when **prior information, success guarantees, and the cost of verification** are accounted for explicitly.
 
-## Main numerical results
+## Results at a glance
 
-Notebook 05 compares the methods at $N=1024$ for $s\in\{1,2,4,8,16,32,64\}$. The table reports **mean complete oracle evaluations**, including candidate verification. Values are rounded from the notebook outputs.
+The primary comparison uses **$N=1024$**, with **$s\in\{1,2,4,8,16,32,64\}$**. Adaptive BBHT uses 3000 completed Monte Carlo trials per marked count. The other columns below are calculated from ideal analytical distributions.
 
-| Marked items $s$ | Known $s$ reference | Adaptive BBHT | Optimal fixed point | Classical, without replacement |
+<p align="center">
+  <img src="figures/finite_query_comparison.png" alt="Expected complete oracle query costs across the tested marked counts" width="880">
+</p>
+
+<p align="center"><sub>Figure 1. Expected complete query cost for the tested strategies. The figure also includes one particular counting assisted policy with a fixed budget of P = 4. Axes are logarithmic.</sub></p>
+
+### Mean complete oracle evaluations
+
+| Marked items $s$ | Known $s$ reference¹ | Adaptive BBHT | Fixed point² | Classical sampling³ |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 22.675 | 51.632 | 64.893 | 512.500 |
-| 2 | 16.197 | 36.923 | 59.519 | 341.667 |
-| 4 | 11.619 | 26.399 | 65.520 | 205.000 |
-| 8 | 8.398 | 18.439 | 59.197 | 113.889 |
-| 16 | 6.125 | 12.836 | 61.463 | 60.294 |
-| 32 | 4.460 | 8.773 | 61.353 | 31.061 |
-| 64 | 3.302 | 5.731 | 61.317 | 15.769 |
+| 1 | 22.675 | **51.632** | 64.893 | 512.500 |
+| 2 | 16.197 | **36.923** | 59.519 | 341.667 |
+| 4 | 11.619 | **26.399** | 65.520 | 205.000 |
+| 8 | 8.398 | **18.439** | 59.197 | 113.889 |
+| 16 | 6.125 | **12.836** | 61.463 | 60.294 |
+| 32 | 4.460 | **8.773** | 61.353 | 31.061 |
+| 64 | 3.302 | **5.731** | 61.317 | 15.769 |
 
-**How to read this table:** The known $s$ method is an **oracle informed reference**, not an equal information competitor. The classical reference avoids repeated checks without needing $s$. Adaptive BBHT values are sample means from 3000 completed Monte Carlo trials for each $s$; the remaining columns are calculated using ideal analytical distributions.
+<sub>¹ This reference knows the true marked count and is not an equal information competitor. ² Yoder, Low, and Chuang search with the conservative promise $s\ge 1$ and a failure tolerance of $0.1$. ³ Uniform classical search without replacement. Each value includes candidate verification according to the model specified in Notebook 05.</sub>
 
-![Expected complete query cost for the finite comparison in Notebook 05](figures/finite_query_comparison.png)
+### What stands out
 
-*Figure: Saved output from Notebook 05. The logarithmic plot compares adaptive BBHT, the known $s$ reference, classical sampling without replacement, conservative fixed point search, and one specific counting assisted policy with its estimation budget fixed at $P=4$. Query counts are mathematical oracle costs, not device execution times.*
+**Adaptation is efficient in the tested regime.** BBHT has a lower observed mean complete query cost than the conservative fixed point schedule at all seven tested marked counts. This is a finite instance finding, not a universal performance ordering.
 
-### What the results show
+**A guarantee and a low expected cost are different goals.** The chosen fixed point sequence guarantees at least **90% success per attempt** whenever $s\ge 1$. Its sequence length is $L=59$, with **58 Boolean oracle evaluations for amplification and one for verification** per attempt.
 
-1. **An incorrect Grover depth can be destructive.** Notebooks 01 and 02 validate the oscillatory success probability and measure sensitivity to a mistaken value of $s$.
-2. **Randomization and adaptation reduce dependence on a single depth.** Notebooks 03 and 04 validate the BBHT randomized success average and evaluate complete adaptive search runs.
-3. **Estimating $s$ does not automatically make the whole search robust.** The specific policy studied in Notebook 05 counts once, chooses one Grover depth, and repeatedly restarts with that depth. Rare inaccurate estimates can give this policy a very large expected cost. For example, at $N=1024$ and $s=8$, its recorded means are approximately $1046.958$ for the preselected budget $P=4$ and $53.236$ for $P=32$. These are **two fixed policies**, not a budget chosen from the true count.
-4. **Fixed point search trades a guarantee for a conservative cost.** With only the promise $s\geq1$ and a target failure probability of $0.1$, the Yoder, Low, and Chuang sequence has length $L=59$ and guarantees at least $90\%$ success per attempt across the promised range. Under the stated oracle model, it costs 58 Boolean oracle evaluations for the amplification sequence plus one verification evaluation per attempt.
-5. **There is no universal winner established here.** Adaptive BBHT has lower observed mean cost than the conservative fixed point schedule for all seven tested counts, but the latter provides a uniform per attempt success guarantee. Different prior bounds, objectives, or accounting assumptions can change the tradeoff.
+**Counting accuracy does not automatically imply a robust search policy.** In the concrete policy evaluated here, one count estimate selects a Grover depth that is then reused after every failed search. Rare inaccurate estimates can select almost destructive depths. For $N=1024$ and $s=8$, this policy has calculated mean costs of approximately **1046.958** queries with a predetermined counting budget $P=4$, versus **53.236** with $P=32$. These results apply to that specified policy, not to all counting assisted algorithms.
 
-## Methods and information assumptions
+## Notebook roadmap
 
-| Method | Information available before search | Role |
+The notebooks form a progressive investigation. Each contains its mathematical setup, implementation, numerical checks, and interpretation.
+
+| Stage | Open notebook | Question investigated |
+| :---: | --- | --- |
+| **01** | [Standard Grover validation](notebooks/01_standard_grover_validation.ipynb) | Do statevector probabilities agree with the analytical amplification curve? |
+| **02** | [Sensitivity to an incorrect solution count](notebooks/02_incorrect_s_sensitivity.ipynb) | What happens when the stopping time is chosen using an incorrect $s$? |
+| **03** | [Randomized Grover iterations](notebooks/03_randomized_iteration_search_analysis.ipynb) | Can randomizing the iteration count reduce dependence on a single stopping depth? |
+| **04** | [Adaptive BBHT search](notebooks/04_adaptive_bbht_search.ipynb) | How does an adaptive randomization window perform without knowing $s$? |
+| **05** | [Strategy comparison](notebooks/05_unknown_s_strategy_comparison.ipynb) | How do classical baselines, BBHT, quantum counting, and fixed point search compare on the same finite problems? |
+
+**Recommended reading:** Start with [Notebook 01](notebooks/01_standard_grover_validation.ipynb) to follow the full derivation, or open [Notebook 05](notebooks/05_unknown_s_strategy_comparison.ipynb) for the integrated comparison.
+
+## Methodology and fairness
+
+The algorithms are not assigned identical information. Their assumptions are part of the comparison rather than hidden implementation details.
+
+| Strategy | Information available before search | Purpose |
 | --- | --- | --- |
-| Known $s$ restart | Exact marked count | Oracle informed performance reference |
-| Classical sampling | $N$, not $s$ | Baselines with and without replacement |
-| Adaptive BBHT | $N$, not $s$ | Randomized search with adaptive iteration window |
-| Counting assisted search | $N$ and a predetermined estimation budget, not $s$ | One counting outcome selects a restart depth |
-| Optimal fixed point search | A reliable lower bound on $s/N$ and a chosen failure tolerance | Predetermined Chebyshev phase sequence |
+| Known $s$ restart | Exact $s$ | Oracle informed reference |
+| Classical sampling | $N$, not $s$ | Reference with and without replacement |
+| Adaptive BBHT | $N$, not $s$ | Randomized search with adaptive range growth |
+| Counting assisted search | $N$ and a fixed counting budget, not $s$ | Estimate once, select a depth, then restart |
+| Optimal fixed point search | A lower bound on $s/N$ and a target failure tolerance | Robust Chebyshev amplification sequence |
 
-**Oracle accounting matters.** For BBHT, one standard Grover iteration is charged one phase marking query, realizable with one Boolean membership oracle evaluation by phase kickback, and each measured candidate is verified with one more evaluation. In the fixed point construction used here, a generalized target phase is implemented using two Boolean membership oracle evaluations. The chosen sequence therefore uses $L-1$ evaluations for amplification, then one for verification. The counting experiment charges its stipulated ideal $P$ oracle query units for the controlled counting stage before accounting for search and verification.
+**Query accounting.** A standard Grover phase marking is charged one Boolean membership oracle evaluation, and checking a measured candidate costs one more. In the fixed point implementation, a generalized target reflection uses two Boolean oracle evaluations. Thus the $L=59$ fixed point schedule costs 58 evaluations for amplification, followed by one verification evaluation. The counting assisted experiment also charges the oracle evaluations assigned to its counting stage.
 
-These conventions make the **ideal query comparison** explicit. They do not imply equivalent circuit depth, gate counts, hardware noise sensitivity, or physical execution time.
+The primary metric is **complete oracle queries to obtain and verify a marked result**, not just Grover iterations. These are ideal mathematical oracle costs. They do not imply equivalent physical circuit depth or hardware execution time.
 
-## Notebook guide
+<details>
+<summary><strong>Explore the effect of stronger fixed point promises</strong></summary>
 
-| Notebook | Purpose |
-| --- | --- |
-| [01: Standard Grover validation](notebooks/01_standard_grover_validation.ipynb) | Check the analytical success curve against Qiskit statevectors and show overshooting. |
-| [02: Incorrect count sensitivity](notebooks/02_incorrect_s_sensitivity.ipynb) | Study how a wrong assumed marked count changes the selected stopping depth and success probability. |
-| [03: Randomized iteration search](notebooks/03_randomized_iteration_search_analysis.ipynb) | Validate the BBHT average success formula and randomized iteration ranges. |
-| [04: Adaptive BBHT](notebooks/04_adaptive_bbht_search.ipynb) | Implement complete adaptive searches, estimate query costs and tails, and test growth factors. |
-| [05: Strategy comparison](notebooks/05_unknown_s_strategy_comparison.ipynb) | Compare known $s$, classical search, adaptive BBHT, the specified counting policy, and optimal fixed point search. |
+<br>
 
-Notebook 05 in `notebooks/` contains the completed strategy comparison.
+If an application reliably promises more than one marked state, the fixed point sequence can be shorter. Notebook 05 examines several supplied lower bounds and failure tolerances. It does **not** choose a bound using the hidden true $s$.
 
-## Reproduce the study
+<p align="center">
+  <img src="figures/fixed_point_prior_sensitivity.png" alt="Fixed point oracle query cost as the guaranteed minimum marked count and failure tolerance change" width="820">
+</p>
 
-The notebooks contain saved code outputs and figures for inspection on GitHub. With a Python environment **already activated**, install the listed dependencies and open Jupyter:
+<p align="center"><sub>Figure 2. Oracle queries per fixed point attempt for different prior lower bounds and target failure tolerances. Saved output from Notebook 05.</sub></p>
+
+</details>
+
+## Run the notebooks
+
+The repository contains executed notebooks with saved numerical tables and figures, which can be viewed directly on GitHub.
+
+In an activated Python environment, run:
 
 ```bash
 git clone https://github.com/ManasviK24/grover-search-unknown-solutions.git
@@ -85,18 +119,17 @@ python -m pip install -r requirements.txt
 jupyter lab
 ```
 
-For instructions on creating and activating a fresh virtual environment on Windows, Linux, or macOS, see [REPRODUCIBILITY.md](REPRODUCIBILITY.md). Run the notebooks in numerical order. The first three use Qiskit statevector tools, while Notebooks 04 and 05 mainly use NumPy, Pandas, and analytical probability models.
+The first three notebooks use Qiskit statevector simulations. Notebooks 04 and 05 primarily use analytical probability expressions and NumPy based numerical experiments.
 
-**Environment provenance:** Metadata in Notebooks 01 through 04 records Python 3.12.0; Notebook 05 records Python 3.13.5. The original executions did **not** capture exact installed package versions. Accordingly, [requirements.txt](requirements.txt) lists dependencies but is **not a historical lockfile**. To document your own rerun, record `python --version` and `python -m pip freeze`. See [REPRODUCIBILITY.md](REPRODUCIBILITY.md) for details and limitations.
+**Environment note:** Notebook metadata records Python 3.12.0 for Notebooks 01 through 04 and Python 3.13.5 for Notebook 05. The original installed dependency versions were not fully captured, so `requirements.txt` is a dependency list, **not** an exact historical lockfile. Consult [REPRODUCIBILITY.md](REPRODUCIBILITY.md) for environment setup, numerical checks, and limitations.
 
-## Research scope and references
+## Sources, scope, and status
 
-The principal comparison has $N=1024$, seven marked counts, deterministic seeds for the BBHT runs, and ideal quantum operations. Fixed point phase construction is checked against the analytical Chebyshev success expression using an independent two dimensional matrix implementation. These experiments do **not** establish noisy hardware performance or asymptotic advantage from measured devices.
+The analysis draws on Grover's original algorithm, the BBHT unknown solution count method, quantum counting and amplitude amplification, and Yoder, Low, and Chuang's optimal fixed point construction. The original research papers are linked in [REFERENCES.md](REFERENCES.md).
 
-See [REFERENCES.md](REFERENCES.md) for the original papers by Grover, Boyer, Brassard, Høyer, Tapp, Yoder, Low, Chuang, and others.
+> [!NOTE]
+> **Scientific scope:** These notebooks investigate ideal oracle models and finite numerical instances. They do not demonstrate quantum advantage on physical hardware, model noisy devices, or establish a new quantum search algorithm.
 
-## Project status and reuse
+**Current status:** Five completed notebooks constitute a public research snapshot. Broader search regimes, alternative counting policies, circuit compilation, and noise studies can be added independently later.
 
-**Status:** Five completed notebooks published as a finite instance research snapshot. Alternative counting policies, additional prior bounds, circuit compilation, and noise studies are possible later extensions, not prerequisites for sharing the present results.
-
-**License:** No license has been selected. Public access to the repository does not, by itself, grant reuse permissions.
+**Reuse:** No license has been selected. Public visibility alone does not grant reuse permissions.

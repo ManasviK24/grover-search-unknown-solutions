@@ -72,7 +72,7 @@ These conventions make the **ideal query comparison** explicit. They do not impl
 | [04: Adaptive BBHT](notebooks/04_adaptive_bbht_search.ipynb) | Implement complete adaptive searches, estimate query costs and tails, and test growth factors. |
 | [05: Strategy comparison](notebooks/05_unknown_s_strategy_comparison.ipynb) | Compare known $s$, classical search, adaptive BBHT, the specified counting policy, and optimal fixed point search. |
 
-An earlier Notebook 05 is retained in [the archive](archive/05_unknown_s_strategy_comparison_original.ipynb). The main version is the completed comparison.
+Notebook 05 in `notebooks/` contains the completed strategy comparison.
 
 ## Reproduce the study
 
